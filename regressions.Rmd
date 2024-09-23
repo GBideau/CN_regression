@@ -2,7 +2,7 @@
 title: "#CN_regressions\nLes communes nouvelles françaises (2012-2024) : proposition d'un modèle explicatif à l'aide de régressions logistiques"
 author: "Gabriel Bideau"
 date: '`r format(Sys.time(), "%d %B %Y %X")`' # %X pour rajouter l'heure
-# bibliography: biblio/biblio.bib
+bibliography: biblio/biblio.bib
 link_citations: true
 output:
      html_document:
@@ -33,7 +33,8 @@ library(flextable) # Pour la création de tableaux
 library(knitr)
 # remotes::install_github("antuki/COGugaison")
 library(COGugaison) # Pour observer les millésimes des données
-library(stringr) # Pour manipuler les chaînes de caractères
+# library(stringr) # Pour manipuler les chaînes de caractères
+# Package utilisé mais pose un problème de compatibilité avec d'autres librairies utilisées donc laissé de côté et appelé directement avec stringr::
 library(units) # Pour modifier les unités
 library(condformat) # Pour formater les sorties des tableaux
 library(forcats)
@@ -87,7 +88,31 @@ library(arm) # Pour étude résidus logit
 options(max.print=100)
 ```
 
-# Présentation
+
+
+
+# Présentation du document
+
+NB : Ce script est un document de travail.
+
+Il étudie les communes nouvelles en proposant un modèle pour observer si certaines variables sont déterminantes dans le fait de créer une commune nouvelle ou non.
+
+Il est mis à disposition dans une logique de science ouverte.
+
+Ce travail s'inscrit dans le cadre d'une étude plus générale sur les communes nouvelles :
+
+https://cv.hal.science/gabriel-bideau
+
+Licence CC-BY-NC-SA.
+
+Il est possible d'accéder au code de ce Markdown ici : https://gbideau.github.io/CN_regression/regressions.Rmd
+
+Les données utilisées pour jouer le code sont regroupées ici :
+https://gbideau.github.io/CN_data/
+
+> Ne pas hésiter à contacter l'auteur (gabriel.bideau@gmail.com) pour toute question.
+
+# Objectifs
 
 L'objectif de ce script est de tester différents modèles de régressions logistiques permettant de modéliser le phénomène des communes nouvelles.
 
@@ -115,12 +140,19 @@ Plan envisagé au départ :
 On n'importe au départ que les données à la géométrie 2011, mentionnant les futures communes nouvelles de rattachement.
 
 ```{r import_data_geom_2011}
-# Import des géométries 2011
-geom2011 <- st_read("Archives/data_prep 2011-2020(01)/data/geom.gpkg", layer = "geom2011", quiet = TRUE) 
-geomfus2011 <- st_read("Archives/data_prep 2011-2020(01)/data/geom.gpkg", layer = "geomfus2011", quiet = TRUE) 
-dep <- st_read("Archives/data_prep 2011-2020(01)/data/geom.gpkg", layer = "dep", quiet = TRUE)
-geom_new <- st_read("Archives/data_prep 2011-2020(01)/data/geom.gpkg", layer = "geom_new", quiet = TRUE) 
-geomCN_new <- st_read("Archives/data_prep 2011-2020(01)/data/geom.gpkg", layer = "geomCN_new", quiet = TRUE)  
+# Import des géométries 2011 avec les fusions uniquement jusqu'au 1er janvier 2022
+geom2011 <- st_read("Archives/data_prep 2011-2022(01)/data/geom.gpkg", layer = "geom2011", quiet = TRUE) 
+geomfus2011 <- st_read("Archives/data_prep 2011-2022(01)/data/geom.gpkg", layer = "geomfus2011", quiet = TRUE) 
+dep <- st_read("Archives/data_prep 2011-2022(01)/data/geom.gpkg", layer = "dep", quiet = TRUE)
+geom_new <- st_read("Archives/data_prep 2011-2022(01)/data/geom.gpkg", layer = "geom_new", quiet = TRUE) 
+geomCN_new <- st_read("Archives/data_prep 2011-2022(01)/data/geom.gpkg", layer = "geomCN_new", quiet = TRUE)  
+
+# Import des géométries 2011 avec les fusions uniquement jusqu'au 1er janvier le plus récent (2024 au moment de l'édition de ce script)
+geom2011 <- st_read("data/geom.gpkg", layer = "geom2011", quiet = TRUE) 
+geomfus2011 <- st_read("data/geom.gpkg", layer = "geomfus2011", quiet = TRUE) 
+dep <- st_read("data/geom.gpkg", layer = "dep", quiet = TRUE)
+geom_new <- st_read("data/geom.gpkg", layer = "geom_new", quiet = TRUE) 
+geomCN_new <- st_read("data/geom.gpkg", layer = "geomCN_new", quiet = TRUE)  
 ```
 
 ## Base DAC
@@ -129,18 +161,23 @@ Base DAC [bideau2022b]
 
 ```{r import_data_DAC}
 # Import des données de la base DAC
+# Si on souhaite importer les données comportant toutes les fusions uniquement jusqu'au 1er janvier 2022 (pour avoir également les données budgétaires) :
+load("Archives/data_prep 2011-2022(01)/data/refdata.Rdata")
+# Mais comme la régression s'appuie uniquement sur les données 2011, on peut prender la base DAC la plus récente
 load("data/refdata.Rdata")
 
-variables_RT <- colnames(df2011[which(str_detect(colnames(df2011), "_RT") == TRUE)])
+variables_RT <- colnames(df2011[which(stringr::str_detect(colnames(df2011), "_RT") == TRUE)])
 
 ```
 
 ## Budgets
 
+Cf. article dans la *RERU*, à paraître en 2024.
+
 ```{r import_data_budgets_2011}
 # Import des données budgétaires pour l'année 2011
-load("data/refdata_budgets_bloccommunal_tot.Rdata")
-rm(df_budgets_new, budgets_com_2011, budgets_com_2020)
+load("data/refdata_budgets_bloccommunal_tot_2011-2022.Rdata")
+rm(df_budgets_new, budgets_com_2011, budgets_com_2022)
 
 # Fusion des données budgétaires avec les autres données
 # On liste les variables renseignées dans les différents df
@@ -157,7 +194,7 @@ df2011 <- merge(df2011,
                      by = "CODGEO", all.x = TRUE, all.y = TRUE)
 
 # Toutes les variables en pourcentages qui sont des variables budgétaires
-variables_budg_prct <- colnames(df2011[which(str_detect(colnames(df2011), "_prct") == TRUE)])
+variables_budg_prct <- colnames(df2011[which(stringr::str_detect(colnames(df2011), "_prct") == TRUE)])
 variables_budg_prct <- variables_budg_prct[variables_budg_prct!= "geometry"] # On supprime la variable "geometry" qui est intégrée sans que cela soit voulu
 
 
@@ -196,7 +233,7 @@ rm(PR2012_T1, colPR2012_T1, coldf2011, colgarder2011_PR2012_T1)
 
 ## Données sur les RPI
 
-Données pas encore mures (seulement données à la géométrie 2024).
+Données pas utilisables en l'état (sont à la géométrie 2024).
 
 ```{r import donnees rpi, eval=FALSE}
 
@@ -212,7 +249,7 @@ summary(is.na(df2011$RPI))
 ```
 
 
-## Données sur la BPE
+## Données sur la BPE (Banque Permanente des Équipements)
 
 ```{r import data BPE}
 
@@ -226,24 +263,33 @@ BPE_communes_decode[is.na(BPE_communes_decode)] <- 0
 BPE_communes_decode <- BPE_communes_decode[, c("CODGEO", "Coiffure", "Supermarché", "École élémentaire", "Médecin omnipraticien", "Taxi", "Salles multisports (gymnase)", "Infirmier", "Pharmacie")]
 
 # Il faut ensuite recoder les variables car on veut faire des catégories
-equipement <- "Pharmacie"
+equipement <- "Médecin omnipraticien"
 for (equipement in colnames(BPE_communes_decode)[2:ncol(BPE_communes_decode)]) {
   seuils <- quantile(BPE_communes_decode[, equipement], probs = seq(0, 1, 0.05), na.rm = TRUE) # Définition des seuils par déciles
   seuils <- unique(seuils) # On ne prend que des valeurs uniques
   seuils[length(seuils)] <- seuils[length(seuils)]+1 # On rajoute 1 à la dernière valeur pour que les catégories définies ensuite englobent toutes les communes
   BPE_communes_decode[, paste0(equipement, "_quantile")] <- cut(BPE_communes_decode[, equipement], breaks = seuils, right = FALSE) # right : pour ouverture de la coupure vers la gauche et non vers la droite comme par défait
+    round(100*prop.table(table(BPE_communes_decode[, equipement]),margin=),2)
+    round(100*prop.table(table(BPE_communes_decode[, paste0(equipement, "_quantile")]),margin=),2)
+
   levels(BPE_communes_decode[, paste0(equipement, "_quantile")])
+  
 }
 
 df2011 <- merge(df2011, BPE_communes_decode,
                      by = "CODGEO", all.x = TRUE)
+
+
+# table(BPE_communes_decode$Supermarché)
+# round(100*prop.table(table(BPE_communes_decode$Supermarché),margin=),2)
 ```
 
 
 # Préparation des données
 
 ## Sélection études de cas
-Section qui sert au départ à tester le code sur de petits ensembles.
+
+Section qui sert, au départ, à tester le code sur de petits ensembles.
 
 À l'avenir, pourra servir à définir des boucles
 
@@ -267,12 +313,20 @@ df2011[, c("EdC_49")] [is.na(df2011[, c("EdC_49")])] <- "NON"
 df2011$EdC_RALP_partiel[df2011$CODE_DEPT %in% c("69", "73", "74", "38", "01")] <- "OUI" # Départements de Savoie, Haute-Savoie, Isère, Rhône et Ain
 df2011[, c("EdC_RALP_partiel")] [is.na(df2011[, c("EdC_RALP_partiel")])] <- "NON"
 
-EdC <- EdCs[1]
+EdC <- EdCs[1] # France
+# EdC <- EdCs[3] # Ouest
+# EdC <- EdCs[4] # Normandie
+# EdC <- EdCs[5] # Maine-et-Loire
 
 df_reg <- subset(df2011, df2011[EdC] == "OUI")
 df_reg_Cfus <- subset(df_reg, df_reg$COM_NOUV == "OUI")
+
 # On peut choisir de se limiter aux communes françaises ayant une population ne dépassant pas celle de la plus peuplée des communes nouvelles
 df_reg <- subset(df_reg, df_reg$P09_POP <= max(df_reg_Cfus$P09_POP))
+
+# Si on veut ne sélectionner que certains départements 
+# departementsEdC <- as.data.frame(table(df_reg$CODE_DEPT))[1]
+# dep <- merge(dep, departementsEdC, by.x = "CODE_DEPT", by.y = "Var1", all.x = FALSE)
 
 # On ajoute les géométries
 geomfus2011 <- merge(geomfus2011, df_reg[, c("CODGEO", "LIBGEO")], by = "CODGEO", all.x = FALSE, all.y = TRUE)
@@ -283,25 +337,25 @@ df_reg <- merge(geom2011, df_reg, by = "CODGEO", all.y = TRUE)
 plot(df_reg$geom, main = paste("Espace étudié :", EdC))
 ```
 
-## Adaptation variables pourcentages
+## Adaptation variables pourcentages [optionnel]
 
-NB : Il y a un problème si on utilise les variables budgétaires en valeurs absolues ou les variables en pourcentages notées 100% = 100. Cela fonctionne correctement si on a les pourcentages notées en 100% = 1.
+NB : Il y a un problème si on utilise les variables budgétaires en valeurs absolues ou les variables en pourcentages notées 100% = 100. Cela fonctionne plus correctement si on a les pourcentages notées en 100% = 1.
 
 Deux possibilités : diviser les pourcentages manuellement ou utiliser le fichier 'refdata_budgets_prct_en_ratio.Rdata'. On choisit la première solution.
 
-Pas vraiment nécessaire car passage des variables quantitatives en variables qualitatives (quantiles).
+Pas vraiment nécessaire si passage des variables quantitatives en variables qualitatives (quantiles, cf. section suivante).
 
 ```{r data_prct_RT, eval=FALSE}
 
 
 # Pour multiplier/diviser
 # Toutes les variables en pourcentages qui sont des variables budgétaires
-variables_budg_prct <- colnames(df_reg[which(str_detect(colnames(df_reg), "_prct") == TRUE)])
+variables_budg_prct <- colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_prct") == TRUE)])
 variables_budg_prct <- variables_budg_prct[variables_budg_prct!= "geometry"] # On supprime la variable "geometry" qui est intégrée sans que cela soit voulu
 df_reg [variables_budg_prct] <- df_reg[variables_budg_prct]/100
 # test <- df_reg[variables_budg_prct]
 
-variables_RT <- colnames(df_reg[which(str_detect(colnames(df_reg), "_RT") == TRUE)])
+variables_RT <- colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_RT") == TRUE)])
 variables_RT <- variables_RT[variables_RT!= "geometry"] # On supprime la variable "geometry" qui est intégrée sans que cela soit voulu
 df_reg [variables_RT] <- df_reg[variables_RT]/100
 # test <- df_reg[variables_RT]
@@ -312,7 +366,7 @@ df_reg [variables_RT] <- df_reg[variables_RT]/100
 ```
 
 
-## Transformations variables quantitatives en variables qualitatives
+## Transformations des variables quantitatives en variables qualitatives
 
 Le principe d'une régression logistique est de définir la probabilité d'un évènement (dans mon cas, fusionner ou non) en fonction du changement d'une variable. Dans le cas d'une variable quantitative, la question est quelle est le pourcentage de chance que l'évènement survienne davantage lorsqu'on augmente la variable quantitative de 1.
 
@@ -322,7 +376,7 @@ Dans le cas d'une variable qualitative, il s'agit du pourcentage de chance que l
 ```{r modfi_quanti_quali, eval=TRUE}
 
 # variable <- "C09_ACTOCC_OUT_RT"
-variables_quanti_quali <- c(variables_budg_prct, variables_RT, variables_elect)
+variables_quanti_quali <- c(variables_budg_prct, variables_RT, variables_elect, "superficie")
 # On retire certaines variables qui ne peuvent être divisées par tertiles car trop de valeurs nulles.
 variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DSU_tot_prct"]
 variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DNP_princip_prct"]
@@ -337,7 +391,8 @@ df_sans_geom <- df_reg # Création d'un jeu de données pour le travail
 st_geometry(df_sans_geom) <- NULL # Suppression des géométries
 # summary(df_sans_geom[, variable])
 variable <- "superficie"
-
+df_sans_geom$superficie <- as.numeric(df_sans_geom$superficie)
+# class(df_sans_geom$superficie)
 
 for (variable in variables_quanti_quali) {
 
@@ -408,6 +463,7 @@ rm(tabcont, X, Y, df_sans_geom, variable, histo)
 
 ## Modifications de quelques autres variables
 
+Là encore, pour les transformer en variables qualitatives.
 
 ```{r prep_variables_ZAU_etc}
 
@@ -440,12 +496,13 @@ df_reg$P09_POP_quali <- cut(df_reg$P09_POP, breaks=c(quantile(df_reg$P09_POP, pr
 levels(df_reg$P09_POP_quali)<-c("Q1","Q2", "Q3", "Q4", "Q5")
 df_reg$P09_POP_quali <- relevel (df_reg$P09_POP_quali, "Q3","Q1", "Q2", "Q4", "Q5")
 
-df_reg$RPI <- as.factor(df_reg$RPI)
-freq(df_reg$RPI, sort = "dec")
-row.names(freq(df_reg$RPI, sort = "dec"))
-ordre <- row.names(freq(df_reg$RPI, sort = "dec"))
-ordre <- c("Ecoles_sans_RPI", "Sans_ecoles", "RPI", "Avec_et_sans_RPI")
-df_reg$RPI <- factor (df_reg$RPI, ordre)
+# RPI pas utilisés pour l'instant
+# df_reg$RPI <- as.factor(df_reg$RPI)
+# freq(df_reg$RPI, sort = "dec")
+# row.names(freq(df_reg$RPI, sort = "dec"))
+# ordre <- row.names(freq(df_reg$RPI, sort = "dec"))
+# ordre <- c("Ecoles_sans_RPI", "Sans_ecoles", "RPI", "Avec_et_sans_RPI")
+# df_reg$RPI <- factor (df_reg$RPI, ordre)
 
 
 ```
@@ -470,10 +527,10 @@ Cf. https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.ht
 # variables_correlations <- vartests
 
 # Toutes les variables en pourcentages NB : ajout du symbole $ pour indiquer que c'est la fin de la chaîne de caractère
-variables_correlations <- c(colnames(df_reg[which(str_detect(colnames(df_reg), "_prct$") == TRUE)]),
-                            colnames(df_reg[which(str_detect(colnames(df_reg), "_RT$") == TRUE)]))
-variables_correlations <- c(colnames(df_reg[which(str_detect(colnames(df_reg), "_prct$") == TRUE)]),
-                            colnames(df_reg[which(str_detect(colnames(df_reg), "_RT$") == TRUE)]), variables_elect)
+variables_correlations <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_prct$") == TRUE)]),
+                            colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_RT$") == TRUE)]))
+variables_correlations <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_prct$") == TRUE)]),
+                            colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_RT$") == TRUE)]), variables_elect)
 
 variables_correlations <- variables_correlations[variables_correlations!= "geometry"] # On supprime la variable "geometry" si elle est intégrée sans que cela soit voulu
 
@@ -792,11 +849,14 @@ df_reg$ChefLieu <- factor (df_reg$ChefLieu, ordre)
 Choix des variables qui doivent éviter celles pointées comme auto-corrélées plus haut. On affiche également le VIF pour limiter au maximum les biais d'interprétation.
 
 
-<!-- L’approche la plus classique consiste à examiner les facteurs d’inflation de la variance (FIV) ou variance inflation factor (VIF) en anglais. Les FIV estimenent de combien la variance d’un coefficient est augmentée en raison d’une relation linéaire avec d’autres prédicteurs. Ainsi, un FIV de 1,8 nous dit que la variance de ce coefficient particulier est supérieure de 80 % à la variance que l’on aurait dû observer si ce facteur n’est absolument pas corrélé aux autres prédicteurs. -->
+L’approche la plus classique consiste à examiner les facteurs d’inflation de la variance (FIV) ou variance inflation factor (VIF) en anglais. Les FIV estimenent de combien la variance d’un coefficient est augmentée en raison d’une relation linéaire avec d’autres prédicteurs. Ainsi, un FIV de 1,8 nous dit que la variance de ce coefficient particulier est supérieure de 80 % à la variance que l’on aurait dû observer si ce facteur n’est absolument pas corrélé aux autres prédicteurs.
 
-<!-- Si tous les FIV sont égaux à 1, il n’existe pas de multicolinéarité, mais si certains FIV sont supérieurs à 1, les prédicteurs sont corrélés. Il n’y a pas de consensus sur la valeur au-delà de laquelle on doit considérer qu’il y a multicolinéarité. Certains auteurs, comme Paul Allison, disent regarder plus en détail les variables avec un FIV supérieur à 2,5. D’autres ne s’inquiètent qu’à partir de 5. Il n’existe pas de test statistique qui permettrait de dire s’il y a colinéarité ou non. (https://larmarange.github.io/analyse-R/multicolinearite.html)-->
+Si tous les FIV sont égaux à 1, il n’existe pas de multicolinéarité, mais si certains FIV sont supérieurs à 1, les prédicteurs sont corrélés. Il n’y a pas de consensus sur la valeur au-delà de laquelle on doit considérer qu’il y a multicolinéarité. Certains auteurs, comme Paul Allison, disent regarder plus en détail les variables avec un FIV supérieur à 2,5. D’autres ne s’inquiètent qu’à partir de 5. Il n’existe pas de test statistique qui permettrait de dire s’il y a colinéarité ou non. (https://larmarange.github.io/analyse-R/multicolinearite.html)
 
-```{r regression_logistique, warning=FALSE}
+```{r regression_logistique, warning=FALSE, eval=FALSE}
+
+# Si on veut importer directement les données du modèle réalisé précédemment
+# load("data/refdata_modele.Rdata")
 
 
 
@@ -816,15 +876,32 @@ reg <- glm(COM_NOUV ~
              # C09_ACTOCC_OUT_RT_quali,
              # C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + CATAEU2010 + CODE_DEPT,
              # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010,
-             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010 + superficie,
+             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010 + superficie_quali,
+             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010 + superficie_quali + CODE_DEPT,
               # CATAEU2010 + P09_POP_quali,
               # CATAEU2010 + RPI,
               # CATAEU2010 + `École élémentaire_quantile`,
               # CATAEU2010 + `École élémentaire_quantile` + `Médecin omnipraticien_quantile`,
-              CATAEU2010 + `Médecin omnipraticien_quantile`,
+              # CATAEU2010 + `Médecin omnipraticien_quantile`,
+
+# Variables ressortant des pas à pas, classées de la plus significative à la moins significative
+             # CODE_DEPT + CATAEU2010 + P11_IMP_NET_RT_quali + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali	 + PotFin4taxes_prct_quali	+ perso_prct_quali	+ res1_prct_quali + Supermarché_quantile + P09_POP_quali + `Médecin omnipraticien_quantile` + P09_POP1529Y_RT_quali + P11_POT_FIN_RT_quali + P09_POP0014Y_RT_quali + dette_prct_quali + P11_FoyFisc_Imp_RT_quali + PR2012_T1_prct_insc_BAYROU_quali + P09_POP4559Y_RT_quali + PR2012_T1_Abst_prct_insc_quali,
+
+# Variables s'inspirant des pas à pas (test1)
+             # CODE_DEPT + P09_POP_quali + CATAEU2010 + `Médecin omnipraticien_quantile` + PotFin4taxes_prct_quali + Supermarché_quantile + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali + P09_POP1529Y_RT_quali + dgf_prct_quali,
+# Variables s'inspirant des pas à pas, sans départements (test2)
+             P09_POP_quali + CATAEU2010 + `Médecin omnipraticien_quantile` + PotFin4taxes_prct_quali + Supermarché_quantile + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali + P09_POP1529Y_RT_quali + dgf_prct_quali,
+
+             # P09_POP_quali + CATAEU2010 + `Médecin omnipraticien_quantile` + PotFin4taxes_prct_quali + Supermarché_quantile + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali + P09_POP1529Y_RT_quali + dgf_prct_quali + PR2012_T1_Abst_prct_insc_quali,
+
+# Quelques variables simples
+             # P09_POP_quali + superficie_quali + CATAEU2010 + CODE_DEPT,
+             # P09_POP_quali + superficie_quali + CATAEU2010,
+             # P09_POP_quali +  CATAEU2010 + CODE_DEPT,
 
            data = df_reg, family = binomial(logit), na.action = na.exclude)
 
+options(max.print=700)
 summary(reg)
 # exp(coef(reg))
 # exp(confint(reg))
@@ -833,7 +910,8 @@ summary(reg)
 
 # Pour vérifier les VIF
 car::vif(reg)
-which(car::vif(reg) > 1.9)
+which(car::vif(reg)[,3] > 1.9)
+# test <- as.data.frame(car::vif(reg))
 
 # Présentation d'un tableau plus propre
 # tbl_regression(reg, exponentiate = TRUE)
@@ -846,7 +924,7 @@ forest_model(reg)
 # Représentation graphique des effets
 # plot(allEffects(reg))
 
-plot_grid(plotlist = plot(ggeffect(reg)))
+# plot_grid(plotlist = plot(ggeffect(reg)))
 # Pour n'afficher qu'une variable :
 # plot(ggeffect(reg, "_nom_de_la_variable"))
 
@@ -857,19 +935,25 @@ screenreg(reg, stars = c(0.01, 0.05, 0.1))
 
 ```
 
-## [À vérifier] Lecture du modèle
+## Lecture du modèle
 
 
-Les odds ratio (littéralement rapport des cotes, ou rapport des chances ou rapport des risques relatiffs) permettent de décrire la significativité pratique. Celle-ci désigne l'impact d'une variable. Il ne faut pas la confondre avec la significativité statistique, qui décrit « le degré de certitude avec lequel on peut affirmer qu'une variable influe » (@afsa2016 p. 39).
+Les odds ratio (littéralement rapport des cotes, ou rapport des chances ou rapport des risques relatifs) permettent de décrire la significativité pratique. Celle-ci désigne l'impact d'une variable. Il ne faut pas la confondre avec la significativité statistique, qui décrit « le degré de certitude avec lequel on peut affirmer qu'une variable influe » (@afsa2016 p. 39).
+
+Il développe : « L’odds ratio attaché à la variable zep est  égal à 1,631, avec [1.416 , 1.878] comme intervalle de confiance à 95%. On l’a vu en section I.6.b, cela signifie précisément que la chance relative de passer en seconde générale est environ 1,6 fois plus élevé pour un enfant en ZEP que pour un enfant hors ZEP, conditionnellement aux facteurs pris en compte dans le modèle (i.e. à sexe, âge, milieu social et niveau en sixième fixés). Il est entendu que la chance relative est un rapport de probabilités : c’est la probabilité de passer en seconde générale rapportée à celle de ne pas y passer. L’odds ratio n’est donc pas un rapport de deux probabilités, mais un rapport de rapports de probabilités. Il ne faut surtout pas dire que le fait d’être en ZEP multiplie par 1,6 la probabilité de passer en seconde générale, à mêmes caractéristiques observées. On verra plus loin que ce résultat est, en ces termes, complètement faux. » (p. 71)
 
 À noter que, par exemple pour @afsa2016, l'expression « toutes choses égales par ailleurs » est à éviter. En effet, ce n'est le cas que si les variables étudiées permettent de décrire parfaitement le phénomène. « les résultats des estimations sont *conditionnels* à la liste des variables *x* introduites dans le modèle, c'est-à-dire qu’ils dépendent des variables introduites » (@afsa2016 p. 53). Si des variables, non mesurées, influent à la fois sur les variables du modèle et la variable étudiée, cela brouille l'analyse. Ainsi, pour les analyses présentées ici, c'est plutôt l'expression "Toutes choses égales quant aux autres variables introduites" qui est à utiliser.
 
-Un Odds ratio égal à 1 signifie que la variable d'intérêt (la fusion ici) est indépendante de la variable explicative envisagée. Si l'OR est supérieur à 1, une commune ayant une variable explicative **plus élevée** ont **plus** de chance de fusionner, s'il est inférieur à 1, les communes avec une variable explicative **plus faible** ont **moins** de chance de fusionner.
+Un Odd ratio égal à 1 signifie que la variable d'intérêt (la fusion ici) est indépendante de la variable explicative envisagée. Si l'OR est supérieur à 1, une commune ayant une variable explicative **plus élevée** ont **plus** de chance de fusionner, s'il est inférieur à 1, les communes avec une variable explicative **plus faible** ont **moins** de chance de fusionner.
 
 ```{r tempchunk, eval=FALSE, echo=FALSE}
-# Formulation dont je ne suis pas du tout certain de la validitié.
 
-paste("Toutes choses égales quant aux autres variables introduites, un ODDS RATIO de", exp(reg$coefficients[2]), "signifie que les communes ayant fusionné ont une probabilité de",  100 *(exp(reg$coefficients[2]) - 1), "%  d'avoir une DGF plus élevée que les communes n'ayant pas fusionné")
+# Formulation dont je ne suis pas du tout certain de la validitié dans le cas des variables numériques. À vérifier.
+# paste("Un ODDS RATIO de", exp(reg$coefficients[2]), "signifie que les communes ayant une DGF plus  élevée ont une chance relative de fusionner de ",  100 *(exp(reg$coefficients[2]) - 1), "%  par rapport à une commune ayant une DGF plus faible, toutes choses étant égales par ailleurs quant aux variables du modèle.")
+
+# Pour les variables qualitatives, je m'appuie sur Afsa (2016)
+paste("Un ODD RATIO de", exp(reg$coefficients[2]), "signifie la chance relative de fusionner est", exp(reg$coefficients[2]), "fois plus élevée pour une commune étant dans la situation de ", row.names(as.data.frame(reg$coefficients[2])) , "par rapport à une commune étant dans la situation de la valeur de référence, toutes choses étant égales par ailleurs quant aux variables du modèle.")
+      
 
 
 ```
@@ -880,18 +964,107 @@ paste("Toutes choses égales quant aux autres variables introduites, un ODDS RAT
 
 ```{r sauvegarde_modele}
 
-try(save(df2011, df_new, df_reg, reg, file = "data/refdata_modele.Rdata"))
+# try(save(df_reg, reg, file = "data/modeles/refdata_modele_test_ttes_communes.Rdata"))
+# try(save(df_reg, reg, file = "data/modeles/refdata_modele_test2.Rdata"))
 
-load("data/refdata_modele.Rdata")
+load("data/modeles/refdata_modele_test2.Rdata")
+
+
+# try(save(test, file = "data/modeles/refdata_modele_test1_tableau_resultats.Rdata"))
+# load("data/modeles/refdata_modele_test1_tableau_resultats.Rdata")
 
 ```
 
 
-# [À faire] Étude des résidus (y compris avec indice de Moran pour une auto-corrélation spatiale des résidus ?)
+## Cartographie de l'effet des départements
+
+
+Pour les modèles intégrant les appartenances départementales, il n'est pas aisé de représenter les résultats dans un tableau. Choix, donc, de réaliser une carte.
+
+
+```{r realisation_carte_effet_departements, eval=TRUE}
+
+# test <- as.data.frame(tbl_regression(reg, exponentiate = TRUE))
+
+# try(save(test, file = "data/modeles/refdata_modele_test1_tableau_resultats.Rdata"))
+load("data/modeles/refdata_modele_test1_tableau_resultats.Rdata")
+
+tableau_departements <- test [3:92,c(1, 2, 4)]
+colnames(tableau_departements) <- c("CODE_DEPT", "OR", "pvalue")
+tableau_departements$pvalue[tableau_departements$pvalue == "<0.001"] <- 0.0001
+tableau_departements$pvalue[tableau_departements$pvalue == ">0.9"] <- 1
+# On passe les variables en numérique
+tableau_departements <- as.data.frame(apply(tableau_departements, 2, as.numeric))
+
+# Choix d'un seuil à partir duquel on ne représente plus les départements
+seuil_choisi <- 0.1
+tableau_departements <- subset(tableau_departements, tableau_departements$pvalue <= seuil_choisi)
+
+tableau_departements <- merge(dep, tableau_departements, by = "CODE_DEPT", all.x = TRUE)
+par(mar=c(0,2,1.2,2))
+
+layoutLayer(title = " ",
+            author = "G. Bideau, 2024",
+            sources = paste0( "Les départements non renseignés ont\nune p-value supérieure à ", seuil_choisi, ".\n\n",
+                              "Sources : INSEE, IGN, 2024"), extent = dep,
+            frame = FALSE,
+            col = "white",
+            tabtitle = FALSE)
+
+plot(st_geometry(dep), col = NA, add = TRUE)
+
+propSymbolsChoroLayer(x = tableau_departements, var = "OR", var2 = "pvalue",
+                      col = rev(carto.pal(pal1 = "red.pal", n1 = 4)), # On inverse l'ordre pour avoir du rouge près de zéro
+                      breaks = c(0, 0.001, 0.01, 0.05, 0.1),
+                      inches = 0.2, method = "q4",
+                      border = "grey50", lwd = 1,
+                      legend.var.pos = "topright", 
+                      legend.var2.pos = "topleft",
+                      legend.var2.values.rnd = 4,
+                      legend.var2.title.txt = "Valeur de la p-value",
+                      legend.var.title.txt = "Odd Ratio",
+                      legend.var.style = "e",
+                      legend.title.cex = 0.9,
+                      legend.values.cex = 0.8,
+                      add = TRUE)
+
+```
+
+
+## Identifier les variables ayant un effet significatif
+
+Cf. https://larmarange.github.io/analyse-R/regression-logistique.html#identifier-les-variables-ayant-un-effet-significatif : " Pour tester l’effet global sur un modèle, on peut avoir recours à la fonction drop1. Cette dernière va tour à tour supprimer chaque variable du modèle et réaliser une analyse de variance (ANOVA, voir fonction anova) pour voir si la variance change significativement."
+
+
+```{r effet des variables, warning=FALSE}
+
+drop1(reg, test = "Chisq")
+
+kable(as.data.frame(drop1(reg, test = "Chisq"))) # Pour identifier les variables ayant un effet significatif 
+
+
+test_anova <- Anova(reg)
+kable(as.data.frame(test_anova))
+
+Anova(reg, type = "II")
+
+
+
+reg %>%
+  tbl_regression(exponentiate = TRUE) %>%
+  add_global_p(type = "II")
+
+```
+
+On observe que les variables des navetteurs et de l'abstention sont potentiellement peu importantes pour le modèle.
+
+
+
+# Étude des résidus (y compris avec indice de Moran pour une auto-corrélation spatiale des résidus ?)
 
 Non-stationnarité spatiale : lorsque les paramètres permettant d'expliquer un phénomènes sont différents en fonction des espaces. Bonne figure p. 185 (Feuillet et al, 2019) où en regardant deux groupes distincts on aperçoit un type de relation alors que lorsqu'on regarde les deux en même temps, on imagine une autre relation statistique. C'est le paradoxe de Simpson (qui n'est pas forcément situé).
 
-Il est donc important voire intéressant de cartographier ou de représenter graphiquement les résidus. Cela permet potentiellement de valider ou invalider le modèle mais également de réfléchir aux espaces où ce modèle fonctionne le mieux ou le moins bien.
+Il est donc intéressant voire important de cartographier ou de représenter graphiquement les résidus. Cela permet potentiellement de valider ou invalider le modèle mais également de réfléchir aux espaces où ce modèle fonctionne le mieux ou le moins bien.
 
 ## Étude résidus régression linéaire (peu pertinent dans le cas d'un logit)
 
@@ -949,23 +1122,40 @@ plot(reg, which = 5)
 Cf. https://pmarchand1.github.io/ECL7102/notes_cours/9-Regression_logistique.pdf#page=9
 
 ```{r etude_residus_logit, eval=FALSE}
+library(arm)
 
 binnedplot(fitted(reg), residuals(reg, type = "response"))
 
+# Graphique prédiction linéaire/résidus
+# Cf. https://lrouviere.github.io/doc_cours/poly_logistique.pdf#page=49
+res_dev <- residuals(reg) #residus de deviance
+res_pear <- residuals(reg,type="pearson") #residus de Pearson
+res_dev_stand <- rstandard(reg) #residu de deviance standardises 
+H <- influence(reg)$hat #diagonale de la hat matrix
+res_pear_stand <- res_pear/sqrt(1-H) #residu de Pearson standardises
+plot(rstudent(reg),type="p",cex=0.5,ylab="Résidus studentisés par VC")
+abline(h=c(-2,2))
+
+# Résidus partiels (résidus pour une variable)
+# Cf. https://lrouviere.github.io/doc_cours/poly_logistique.pdf#page=50
+residpartiels<-resid(reg,type="partial")
+prov<-loess(residpartiels[,"P09_POP_quali"]~df_reg$P09_POP_quali)
+ordre<-order(df_reg$P09_POP_quali)
+plot(df_reg$P09_POP_quali,residpartiels[,"P09_POP_quali"],type="p",cex=0.5,xlab="",ylab="")
+matlines(df_reg$P09_POP_quali[ordre],predict(prov)[ordre])
+abline(lsfit(df_reg$P09_POP_quali,residpartiels[,"P09_POP_quali"]),lty=2)
 
 ```
 
-
-## Tentative cartographie résidus
+## Cartographie des résidus
 
 ```{r carto_residus}
 
 # residuals (reg)
 # On intègre les résidus aux données
 df_reg$residus <- residuals (reg)
-par(mar=c(0,0,1.2,0), mfrow = c(1,2))
+par(mar=c(8,0,8,0), mfrow = c(1,2))
 
-plot(st_geometry(dep), col = NA)
 
 choroLayer(x = df_reg , var = "residus", 
            method = "quantile", nclass = 6,
@@ -974,29 +1164,49 @@ choroLayer(x = df_reg , var = "residus",
            colNA = "white",
            legend.pos = "topleft", legend.values.rnd = 2,
            legend.title.txt = "Résidus",
-           add = TRUE)
+           # add = TRUE
+           )
 
-layoutLayer(title = "Cartographie des résidus",
-            author = "G. Bideau, 2024.",
-            sources = "Sources : ")
+plot(st_geometry(dep), col = NA,
+     add = TRUE
+     )
+
+layoutLayer(title = "Cartographie des résidus du modèle",
+            author = "Auteur : G. Bideau, 2024.",
+            sources = "Sources : INSEE, 2024.", col = "white", coltitle = "black")
 
 typoLayer(x = df_reg, var = "COM_NOUV",
           legend.values.order = c("OUI", "NON"),
           legend.pos = "topleft",
           col=c("red","blue"),
-          legend.title.txt = "Communes nouvelles",
+          legend.title.txt = "Communes fusionnantes",
           border = NA)
 
-layoutLayer(title = "Communes nouvelles 2012-2024(01)",
-            author = "G. Bideau, 2024.",
-            sources = "Sources : ")
+layoutLayer(title = "Participation à une commune nouvelle 2012-2024(01)",
+            author = "Auteur : G. Bideau, 2024.",
+            sources = "Sources : INSEE, 2024.", col = "white", coltitle = "black")
 
 par(mar = c(0,0,0,0), mfrow = c(1,1))
 ```
 
+
+
+
+```{r limite_pas_jouer, eval=TRUE, cache=FALSE}
+knitr::opts_chunk$set(echo=FALSE, # Afficher ou non le code R dans le document
+                      eval=FALSE, #	Exécuter ou non le code R à la compilation
+                      include=TRUE, #	Inclure ou non le code R et ses résultats dans le document
+                      # results	“hide”/“asis”/“markup”/“hold”	Type de résultats renvoyés par le bloc de code
+                      warning=TRUE, # Afficher ou non les avertissements générés par le bloc
+                      message=TRUE, # Afficher ou non les messages générés par le bloc
+                      cache=TRUE) # Utiliser le cache pour accélerer les knits.
+```
+
+
+
 ## Test de Moran sur auto-corrélation spatiale des résidus (package rgeoda)
 
-```{r LISA_rgeodata, cache=TRUE}
+```{r LISA_rgeodata, cache=TRUE, eval=FALSE}
 
 test_geom <- df_reg
 
@@ -1063,9 +1273,9 @@ rm(variable, df_variable, lms, pvals, cats, lbls, num_levels, couleurs)
 
 ```
 
-# [À vérifier, tester] *Forward stepwise* ou *backward stepwise*
+# Sélection *step by step*, *Forward stepwise* ou *backward stepwise*
 
-Possibilité de sélectionner automatiquement les variables à choisir pour une régression logistique [feuillet2019] :
+Possibilité de sélectionner automatiquement les variables à choisir pour une régression logistique [feuillet2019] p. 174 :
 
 - régression pas à pas ascendante (on ajoute des variables à partir d'un tableau de données) : *forward stepwise*  ;
 
@@ -1076,19 +1286,68 @@ Guides pour mettre en place ces méthodes : https://www.statology.org/stepwise-r
 ## Sélection des données
 
 ```{r selection data_step_by_step}
-
 # Sélection d'une partie de df_reg pour le step by step
 
-variables_sbs <- c(colnames(df_reg[which(str_detect(colnames(df_reg), "_prct") == TRUE)]),
-                            colnames(df_reg[which(str_detect(colnames(df_reg), "_RT") == TRUE)]))
-variables_sbs <- c(colnames(df_reg[which(str_detect(colnames(df_reg), "_prct") == TRUE)]),
-                            colnames(df_reg[which(str_detect(colnames(df_reg), "_RT") == TRUE)]), "CATAEU2010", "CODE_DEPT")
+# Sélection des variables quantitatives classiques
+variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_prct") == TRUE)]),
+                            colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_RT") == TRUE)]))
+variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_prct") == TRUE)]),
+                            colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_RT") == TRUE)]), "CATAEU2010", "CODE_DEPT")
+
+
 variables_sbs <- c(variables_sbs, variables_elect)
-variables_sbs <- variables_sbs[variables_sbs!= "geometry"] # On supprime la variable "geometry" qui est intégrée sans que cela soit voulu
 
-# On ne conserve que les variables qu'on a validé du point de vue du risque d'auto-corrélation
-variables_sbs <- intersect(variables_sbs, variables_correlations) 
+# En ne prenant que les variables passées en quantiles
+variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantile") == TRUE)]),
+                   colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quali") == TRUE)]),
+                   "CATAEU2010", "CODE_DEPT")
+# variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantile") == TRUE)]),
+#                    colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quali") == TRUE)]),
+#                    "CATAEU2010")# enleve CODE_DEPT pour étude d'un département en particuler
 
+# On supprime la variable "geometry" qui est intégrée sans que cela soit voulu
+variables_sbs <- variables_sbs[variables_sbs!= "geometry"]
+
+
+```
+
+## Vérification des auto-corrélations et des manques de données
+
+
+```{r selection data_step_by_step autocor}
+
+# Définition du seuil d'auto-corrélation
+seuil <- 0.7
+
+# Définition d'un df spécifique
+df_autocor <- df_reg[, c("COM_NOUV", variables_sbs)]
+
+variables_correlations <- variables_sbs
+
+# On regarde les variables qui ont beaucoup de NA
+nbr_na <- as.data.frame(apply(df_autocor, MARGIN = 2, function(x){sum(is.na(x))}))
+nbr_na
+
+# On désigne les variables qui ont plus de 5000 NA 
+a_retirer <- row.names(nbr_na)[which(nbr_na$`apply(df_autocor, MARGIN = 2, function(x) {     sum(is.na(x)) })` > 1600)]
+
+# On retire les variables en question
+variables_correlations <- setdiff(variables_correlations, a_retirer)
+
+# [Suite à utiliser si on a des variables quantitatives, ce qui n'est pas le cas ici.]
+
+# Juste pour les communes fusionnées
+# tmp <- subset(df_autocor, df_autocor$COM_NOUV == "OUI")
+# tmp <- na.omit(tmp [, variables_correlations])
+
+# tmp2 <- cor(tmp, method = "pearson")
+# res1 <- cor.mtest(tmp, conf.level = .99)
+
+# Reprendre ensuite le code utilisé plus haut pour observer l'autocorrélation
+
+
+# On n'utilise que les données qui n'ont pas trop de NA
+variables_sbs <- setdiff(variables_sbs, a_retirer)
 df_reg_sbs <- df_reg[, c("COM_NOUV", variables_sbs)]
 
 df_reg_sbs <- na.omit(df_reg_sbs)
@@ -1098,10 +1357,13 @@ df_reg_sbs <- st_set_geometry (df_reg_sbs, NULL)
 
 ```
 
+
+
+
 ## Régression pas à pas 
 
-```{r stepwise, warning = FALSE, message = FALSE}
-
+### Préparation données pour régression stepwise
+```{r stepwise preparation, warning = TRUE, message = TRUE}
 # Pour procéder avec la sélection ascendante (Forward selection) on doit d’abord spécifier le modèle de départ
 m0 <- glm(COM_NOUV ~ 1, data=df_reg_sbs, family = binomial(logit), na.action = na.exclude)  # choix du modèle avec constante seulement
 # m0
@@ -1109,48 +1371,186 @@ m0 <- glm(COM_NOUV ~ 1, data=df_reg_sbs, family = binomial(logit), na.action = n
 # Pour utiliser la commande step on doit spécifier le modèle de départ m0 et le modèle maximal mf qui peut être le modèle complet.
 mf <- glm(COM_NOUV ~ ., data=df_reg_sbs, family = binomial(logit), na.action = na.exclude)  # choix du modèle avec constante seulement
 # mf
+```
 
+### Stepwise ascendante (forward)
+
+```{r stepwise forward, warning=FALSE}
 # La sélection ascendante utilisant le critère AIC
 # step(m0, scope=list(lower=m0, upper=mf), data = df_reg_sbs, direction="forward")
 reg_sbs_forward <- step(m0, scope=list(lower=m0, upper=mf), data = df_reg_sbs, direction="forward", trace = FALSE)
 add_vif(tbl_regression(reg_sbs_forward, exponentiate = TRUE)) # Pour afficher les VIF
 
+# Pour identifier les variables ayant un effet significatif 
+test_reg_chi2 <- drop1(reg_sbs_forward, test = "Chisq")
+test_reg_chi2
+kable(as.data.frame(test_reg_chi2)) 
+
+test_anova <- Anova(reg_sbs_forward)
+kable(as.data.frame(test_anova))
+
+try(save(df_reg, reg_sbs_forward, file = "data/refdata_modele_sbs_forward_Ouest.Rdata"))
+# load("data/refdata_modele.Rdata")
+
+# Cartographie des résultats
+# residuals (reg)
+# On intègre les résidus aux données
+df_reg$residus <- residuals (reg)
+par(mar=c(0,0,1.2,0), mfrow = c(1,2))
+
+
+choroLayer(x = df_reg , var = "residus", 
+           method = "quantile", nclass = 6,
+           col = carto.pal(pal1 = "blue.pal", pal2 = "red.pal", n1 = 3, n2 = 3),
+           border = NA,
+           colNA = "white",
+           legend.pos = "topleft", legend.values.rnd = 2,
+           legend.title.txt = "Résidus")
+plot(st_geometry(dep), col = NA, add = TRUE)
+
+layoutLayer(title = "Cartographie des résidus",
+            author = "G. Bideau, 2024.",
+            sources = "Sources : ")
+
+typoLayer(x = df_reg, var = "COM_NOUV",
+          legend.values.order = c("OUI", "NON"),
+          legend.pos = "topleft",
+          col=c("red","blue"),
+          legend.title.txt = "Communes nouvelles",
+          border = NA)
+
+layoutLayer(title = "Communes nouvelles 2012-2024(01)",
+            author = "G. Bideau, 2024.",
+            sources = "Sources : ")
+
+par(mar = c(0,0,0,0), mfrow = c(1,1))
+
+```
+
+
+
+
+### Stepwise descendante (backward)
+
+```{r stepwise backward, warning=FALSE}
 # La sélection descendante
 # step(mf, data = df_reg_sbs, direction="backward")
 reg_sbs_backward <- step(mf, data = df_reg_sbs, direction="backward", na.action = na.omit, trace = FALSE)
 add_vif(tbl_regression(reg_sbs_backward, exponentiate = TRUE)) # Pour afficher les VIF
 
+# Pour identifier les variables ayant un effet significatif 
+test_reg_chi2 <- drop1(reg_sbs_backward, test = "Chisq")
+test_reg_chi2
+kable(as.data.frame(test_reg_chi2)) 
+
+test_anova <- Anova(reg_sbs_backward)
+kable(as.data.frame(test_anova))
+
+```
+
+
+
+### Stepwise dans les deux sens
+
+Non joué pour l'instant car bloque ?
+
+```{r stepwise deux sens, warning=FALSE, eval=FALSE}
 # La sélection pas a pas dans les deux sens
 # step(m0, scope = list(upper=mf), data = df_reg_sbs,direction="both")
 reg_sbs_both <- step(m0, scope = list(upper=mf), data = df_reg_sbs,direction="both", trace = FALSE)
 add_vif(tbl_regression(reg_sbs_both, exponentiate = TRUE)) # Pour afficher les VIF
 
+# Pour identifier les variables ayant un effet significatif 
+test_reg_chi2 <- drop1(reg_sbs_both, test = "Chisq")
+test_reg_chi2
+kable(as.data.frame(test_reg_chi2)) 
+
+
+test_anova <- Anova(reg_sbs_forward_F)
+kable(as.data.frame(test_anova))
+
+
+```
+
+
+### Stepwise F-test ascendante (forward)
+
+
+```{r stepwise modeles emboites ascendante, warning=FALSE}
 # La sélection ascendante utilisant le F−test des modèles emboîtés.
 # step(m0, scope=list(lower=m0, upper=mf), data = df_reg_sbs, direction="forward",test="F")
 reg_sbs_forward_F <- step(m0, scope=list(lower=m0, upper=mf), data = df_reg_sbs, direction="forward",test="F", trace = FALSE)
 add_vif(tbl_regression(reg_sbs_forward_F, exponentiate = TRUE)) # Pour afficher les VIF
 
+# Pour identifier les variables ayant un effet significatif 
+test_reg_chi2 <- drop1(reg_sbs_forward_F, test = "Chisq")
+test_reg_chi2
+kable(as.data.frame(test_reg_chi2)) 
+
+test_anova <- Anova(reg_sbs_forward_F)
+kable(as.data.frame(test_anova))
+
+```
+
+### Stepwise F-test descendante (backward)
+
+```{r stepwise Ftest descendante, warning=FALSE}
 # La sélection descendante avec le F−test
 # step(mf, data = df_reg_sbs, direction="backward")
 reg_sbs_backward_F <- step(mf, data = df_reg_sbs, direction="backward", trace = FALSE)
 add_vif(tbl_regression(reg_sbs_backward_F, exponentiate = TRUE)) # Pour afficher les VIF
 
+
+# Pour identifier les variables ayant un effet significatif 
+test_reg_chi2 <- drop1(reg_sbs_backward_F, test = "Chisq")
+test_reg_chi2
+kable(as.data.frame(test_reg_chi2)) 
+
+test_anova <- Anova(reg_sbs_backward_F)
+kable(as.data.frame(test_anova))
+
+```
+
+
+
+
+
+
+
+
+### Stepwise F-test deux sens
+
+```{r stepwise Ftest deux sens, warning=FALSE}
 # La sélection pas à pas dans les deux sens avec le F−test
 # step(m0, scope = list(upper=mf), data = df_reg_sbs, direction="both")
 reg_sbs_both_F <- step(m0, scope = list(upper=mf), data = df_reg_sbs, direction="both", trace = FALSE)
 add_vif(tbl_regression(reg_sbs_both_F, exponentiate = TRUE)) # Pour afficher les VIF
 
+
+# Pour identifier les variables ayant un effet significatif 
+test_reg_chi2 <- drop1(reg_sbs_both_F, test = "Chisq")
+test_reg_chi2
+kable(as.data.frame(test_reg_chi2)) 
+
+test_anova <- Anova(reg_sbs_both_F)
+kable(as.data.frame(test_anova))
+
+
 ```
 
-## Algorithme génétique
+
+
+
+## Tentative algorithme génétique
 
 Section 3.5 de la page déjà citée : https://rstudio-pubs-static.s3.amazonaws.com/205694_3b195f29e9504d23aeb483ff1ffafeba.html#lalgorithme-genetique
 
-Mais ne fonctionne pas : problème pour installer glmulti sur RStudio Server + message d'erreur "!Oversized candidate set."
+Ne fonctionne pas (message d'erreur : "Erreur dans .subset2(x, i, exact = exact) :  tentative de sélection de moins d'un élément dans get1index").
 
 ```{r utilis_glmulti, eval=FALSE}
 df_reg_gen <- df_reg_sbs[1:50,1:10]
-res3 <- glmulti(COM_NOUV~.,data = df_reg_gen,level = 2,method = "g",fitfunction = lm,crit = 'aic',plotty = F)
+res3 <- glmulti::glmulti(COM_NOUV~.,data = df_reg_gen, level = 2, method = "g", fitfunction = lm, crit = 'aic', plotty = F)
+> res3<-glmulti(Life.Exp~.,data = statedata,level = 2,method = "g",fitfunction = lm,crit = 'aic',plotty = F)
 
 ```
 
