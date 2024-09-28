@@ -268,11 +268,11 @@ for (equipement in colnames(BPE_communes_decode)[2:ncol(BPE_communes_decode)]) {
   seuils <- quantile(BPE_communes_decode[, equipement], probs = seq(0, 1, 0.05), na.rm = TRUE) # Définition des seuils par déciles
   seuils <- unique(seuils) # On ne prend que des valeurs uniques
   seuils[length(seuils)] <- seuils[length(seuils)]+1 # On rajoute 1 à la dernière valeur pour que les catégories définies ensuite englobent toutes les communes
-  BPE_communes_decode[, paste0(equipement, "_quantile")] <- cut(BPE_communes_decode[, equipement], breaks = seuils, right = FALSE) # right : pour ouverture de la coupure vers la gauche et non vers la droite comme par défait
+  BPE_communes_decode[, paste0(equipement, "_quantiles")] <- cut(BPE_communes_decode[, equipement], breaks = seuils, right = FALSE) # right : pour ouverture de la coupure vers la gauche et non vers la droite comme par défait
     round(100*prop.table(table(BPE_communes_decode[, equipement]),margin=),2)
-    round(100*prop.table(table(BPE_communes_decode[, paste0(equipement, "_quantile")]),margin=),2)
+    round(100*prop.table(table(BPE_communes_decode[, paste0(equipement, "_quantiles")]),margin=),2)
 
-  levels(BPE_communes_decode[, paste0(equipement, "_quantile")])
+  levels(BPE_communes_decode[, paste0(equipement, "_quantiles")])
   
 }
 
@@ -373,19 +373,21 @@ Le principe d'une régression logistique est de définir la probabilité d'un é
 Dans le cas d'une variable qualitative, il s'agit du pourcentage de chance que l'évènement survienne davantage lorsqu'on change de catégorie. Il faut donc faire attention à mettre la variable en facteur, avec la première valeur qui doit être celle de référence (c'est à partir de celle-là que les comparaisons vont être faites, c'est donc important car c'est cela qui détermine le discours). 
 
 
-```{r modfi_quanti_quali, eval=TRUE}
+```{r modfi_quanti_quantiles, eval=TRUE}
 
 # variable <- "C09_ACTOCC_OUT_RT"
-variables_quanti_quali <- c(variables_budg_prct, variables_RT, variables_elect, "superficie")
+# variables_quanti_quantiles <- c(variables_budg_prct, variables_RT, variables_elect, "superficie")
+variables_quanti_quantiles <- c(variables_budg_prct, variables_RT, variables_elect, "superficie", "CIF_2012", "CIF_2015")
+
 # On retire certaines variables qui ne peuvent être divisées par tertiles car trop de valeurs nulles.
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DSU_tot_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DNP_princip_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DNP_sortie_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DNP_major_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DNP_tot_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DSR_bourg_centre_global_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="DSR_cible_global_prct"]
-variables_quanti_quali <- variables_quanti_quali[variables_quanti_quali!="C09_EMPLT_INDUS_RT"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DSU_tot_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DNP_princip_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DNP_sortie_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DNP_major_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DNP_tot_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DSR_bourg_centre_global_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="DSR_cible_global_prct"]
+variables_quanti_quantiles <- variables_quanti_quantiles[variables_quanti_quantiles!="C09_EMPLT_INDUS_RT"]
 
 df_sans_geom <- df_reg # Création d'un jeu de données pour le travail
 st_geometry(df_sans_geom) <- NULL # Suppression des géométries
@@ -394,7 +396,7 @@ variable <- "superficie"
 df_sans_geom$superficie <- as.numeric(df_sans_geom$superficie)
 # class(df_sans_geom$superficie)
 
-for (variable in variables_quanti_quali) {
+for (variable in variables_quanti_quantiles) {
 
 Y <- df_sans_geom[, variable] # On se focalise sur une variable en particulier
 
@@ -411,12 +413,12 @@ colnames(med) <- c("median", "COM_NOUV")
 # On veut observer graphiquement la distribution statistique
 histo <- ggplot(df_sans_geom)+
   geom_histogram(aes(x=df_sans_geom[, variable], color = COM_NOUV), bins=50)+
-  labs(title = paste("Variable étudiée :\n", variable), subtitle = "Pointillés : moyennes.\nLigne pleine : médianes.")+
+  labs(title = paste("Variable étudiée :\n", variable), subtitle = "Pointillés : moyennes.\nLignes pleines : médianes.")+
   # geom_vline(aes(xintercept=median(df_sans_geom[, variable], na.rm = T)),      color="black", linetype="dashed" )+
   geom_vline(data=moy, aes(xintercept=moyenne, color=COM_NOUV),             linetype="dashed") +
   geom_vline(data=med, aes(xintercept=median, color=COM_NOUV)) +
   ylab("Count")+theme_light()
-print(histo)
+# print(histo)
 
 # On découpe en fonction du quantile souhaité puis on modifie l'ordre de niveaux de facteur pour que la variable centrale soit la première
 
@@ -452,7 +454,7 @@ tabcont # En valeur absolue
 # round(100*prop.table(tabcont,margin=2),1) # Pourcentages, le total se fait par colonnes
 
 # On verse les nouvelles données au data frame
-df_reg[, paste0(variable, "_quali")] <- Y
+df_reg[, paste0(variable, "_quantiles")] <- Y
 
 }
 
@@ -492,9 +494,9 @@ df_reg$REG <- factor (df_reg$REG, ordre)
 
 
 df_reg$P09_POP <- as.numeric(df_reg$P09_POP)
-df_reg$P09_POP_quali <- cut(df_reg$P09_POP, breaks=c(quantile(df_reg$P09_POP, probs=seq(0, 1, 1/5), na.rm = TRUE)))
-levels(df_reg$P09_POP_quali)<-c("Q1","Q2", "Q3", "Q4", "Q5")
-df_reg$P09_POP_quali <- relevel (df_reg$P09_POP_quali, "Q3","Q1", "Q2", "Q4", "Q5")
+df_reg$P09_POP_quantiles <- cut(df_reg$P09_POP, breaks=c(quantile(df_reg$P09_POP, probs=seq(0, 1, 1/5), na.rm = TRUE)))
+levels(df_reg$P09_POP_quantiles)<-c("Q1","Q2", "Q3", "Q4", "Q5")
+df_reg$P09_POP_quantiles <- relevel (df_reg$P09_POP_quantiles, "Q3","Q1", "Q2", "Q4", "Q5")
 
 # RPI pas utilisés pour l'instant
 # df_reg$RPI <- as.factor(df_reg$RPI)
@@ -541,7 +543,7 @@ seuil <- 0.7
 ```
 
 
-```{r analyse_correlations_subsets}
+```{r analyse_correlations_subsets, eval=FALSE}
 # Juste pour les communes fusionnées
 tmp <- subset(df2011, df2011$COM_NOUV == "OUI")
 tmp <- na.omit(tmp [, variables_correlations])
@@ -610,7 +612,7 @@ for(i in 1:nrow(tmp2)) {
 ```
 
 
-```{r analyse_correlations_ttes_communes}
+```{r analyse_correlations_ttes_communes, eval=FALSE}
 # Ensemble des communes françaises
 tmp <- df2011
 tmp <- na.omit(tmp [, variables_correlations])
@@ -792,6 +794,7 @@ cowplot::plot_grid(aa, bb, cc, ncol = 1, nrow = 3)
 
 
 
+
 # Régression logistique classique
 
 Cf. par exemple https://larmarange.github.io/analyse-R/regression-logistique.html.
@@ -853,7 +856,7 @@ L’approche la plus classique consiste à examiner les facteurs d’inflation d
 
 Si tous les FIV sont égaux à 1, il n’existe pas de multicolinéarité, mais si certains FIV sont supérieurs à 1, les prédicteurs sont corrélés. Il n’y a pas de consensus sur la valeur au-delà de laquelle on doit considérer qu’il y a multicolinéarité. Certains auteurs, comme Paul Allison, disent regarder plus en détail les variables avec un FIV supérieur à 2,5. D’autres ne s’inquiètent qu’à partir de 5. Il n’existe pas de test statistique qui permettrait de dire s’il y a colinéarité ou non. (https://larmarange.github.io/analyse-R/multicolinearite.html)
 
-```{r regression_logistique, warning=FALSE, eval=FALSE}
+```{r regression_logistique, warning=FALSE, eval=TRUE}
 
 # Si on veut importer directement les données du modèle réalisé précédemment
 # load("data/refdata_modele.Rdata")
@@ -870,35 +873,47 @@ reg <- glm(COM_NOUV ~
              # P09_RETR1564_RT + C09_ACT1564_Agr_RT + P09_POP3044Y_RT + C09_ACTOCC_OUT_RT + P09_CHOM1564_RT + dgf_prct + perso_prct,
              # P09_RETR1564_RT + C09_ACT1564_Agr_RT + C09_ACTOCC_OUT_RT + P09_CHOM1564_RT,
              # P09_ETUD1564_RT + C09_ACT1564_Ouvr_RT + C09_ACTOCC_OUT_RT + P09_CHOM1564_RT,
-             # C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT + dgf_prct,
-             # C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + dgf_prct_quali, # Effets faibles mais significatifs
-             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali,
-             # C09_ACTOCC_OUT_RT_quali,
-             # C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + CATAEU2010 + CODE_DEPT,
-             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010,
-             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010 + superficie_quali,
-             # P09_ETUD1564_RT_quali + C09_ACT1564_Ouvr_RT_quali + C09_ACTOCC_OUT_RT_quali + P09_CHOM1564_RT_quali + P09_POP1529Y_RT_quali + P09_POP_quali + PR2012_T1_Abst_prct_insc_quali + PR2012_T1_prct_insc_LE.PEN_quali + dgf_prct_quali + perso_prct_quali + CATAEU2010 + superficie_quali + CODE_DEPT,
-              # CATAEU2010 + P09_POP_quali,
+             # C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT + dgf_prct,
+             # C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT_quantiles + dgf_prct_quantiles, # Effets faibles mais significatifs
+             # P09_ETUD1564_RT_quantiles + C09_ACT1564_Ouvr_RT_quantiles + C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT_quantiles,
+             # C09_ACTOCC_OUT_RT_quantiles,
+             # C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT_quantiles + P09_POP1529Y_RT_quantiles + P09_POP_quantiles + PR2012_T1_Abst_prct_insc_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + CATAEU2010 + CODE_DEPT,
+             # P09_ETUD1564_RT_quantiles + C09_ACT1564_Ouvr_RT_quantiles + C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT_quantiles + P09_POP1529Y_RT_quantiles + P09_POP_quantiles + PR2012_T1_Abst_prct_insc_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + dgf_prct_quantiles + perso_prct_quantiles + CATAEU2010,
+             # P09_ETUD1564_RT_quantiles + C09_ACT1564_Ouvr_RT_quantiles + C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT_quantiles + P09_POP1529Y_RT_quantiles + P09_POP_quantiles + PR2012_T1_Abst_prct_insc_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + dgf_prct_quantiles + perso_prct_quantiles + CATAEU2010 + superficie_quantiles,
+             # P09_ETUD1564_RT_quantiles + C09_ACT1564_Ouvr_RT_quantiles + C09_ACTOCC_OUT_RT_quantiles + P09_CHOM1564_RT_quantiles + P09_POP1529Y_RT_quantiles + P09_POP_quantiles + PR2012_T1_Abst_prct_insc_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + dgf_prct_quantiles + perso_prct_quantiles + CATAEU2010 + superficie_quantiles + CODE_DEPT,
+              # CATAEU2010 + P09_POP_quantiles,
               # CATAEU2010 + RPI,
-              # CATAEU2010 + `École élémentaire_quantile`,
-              # CATAEU2010 + `École élémentaire_quantile` + `Médecin omnipraticien_quantile`,
-              # CATAEU2010 + `Médecin omnipraticien_quantile`,
+              # CATAEU2010 + `École élémentaire_quantiles`,
+              # CATAEU2010 + `École élémentaire_quantiles` + `Médecin omnipraticien_quantiles`,
+              # CATAEU2010 + `Médecin omnipraticien_quantiles`,
 
 # Variables ressortant des pas à pas, classées de la plus significative à la moins significative
-             # CODE_DEPT + CATAEU2010 + P11_IMP_NET_RT_quali + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali	 + PotFin4taxes_prct_quali	+ perso_prct_quali	+ res1_prct_quali + Supermarché_quantile + P09_POP_quali + `Médecin omnipraticien_quantile` + P09_POP1529Y_RT_quali + P11_POT_FIN_RT_quali + P09_POP0014Y_RT_quali + dette_prct_quali + P11_FoyFisc_Imp_RT_quali + PR2012_T1_prct_insc_BAYROU_quali + P09_POP4559Y_RT_quali + PR2012_T1_Abst_prct_insc_quali,
+             # CODE_DEPT + CATAEU2010 + P11_IMP_NET_RT_quantiles + C09_EMP_CONC_RT_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles	 + PotFin4taxes_prct_quantiles	+ perso_prct_quantiles	+ res1_prct_quantiles + Supermarché_quantiles + P09_POP_quantiles + `Médecin omnipraticien_quantiles` + P09_POP1529Y_RT_quantiles + P11_POT_FIN_RT_quantiles + P09_POP0014Y_RT_quantiles + dette_prct_quantiles + P11_FoyFisc_Imp_RT_quantiles + PR2012_T1_prct_insc_BAYROU_quantiles + P09_POP4559Y_RT_quantiles + PR2012_T1_Abst_prct_insc_quantiles,
 
 # Variables s'inspirant des pas à pas (test1)
-             # CODE_DEPT + P09_POP_quali + CATAEU2010 + `Médecin omnipraticien_quantile` + PotFin4taxes_prct_quali + Supermarché_quantile + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali + P09_POP1529Y_RT_quali + dgf_prct_quali,
+             # CODE_DEPT + P09_POP_quantiles + CATAEU2010 + `Médecin omnipraticien_quantiles` + PotFin4taxes_prct_quantiles + Supermarché_quantiles + C09_EMP_CONC_RT_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + P09_POP1529Y_RT_quantiles + dgf_prct_quantiles,
 # Variables s'inspirant des pas à pas, sans départements (test2)
-             P09_POP_quali + CATAEU2010 + `Médecin omnipraticien_quantile` + PotFin4taxes_prct_quali + Supermarché_quantile + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali + P09_POP1529Y_RT_quali + dgf_prct_quali,
+             # P09_POP_quantiles + CATAEU2010 + `Médecin omnipraticien_quantiles` + PotFin4taxes_prct_quantiles + Supermarché_quantiles + C09_EMP_CONC_RT_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + P09_POP1529Y_RT_quantiles + dgf_prct_quantiles,
 
-             # P09_POP_quali + CATAEU2010 + `Médecin omnipraticien_quantile` + PotFin4taxes_prct_quali + Supermarché_quantile + C09_EMP_CONC_RT_quali + PR2012_T1_prct_insc_LE.PEN_quali + P09_POP1529Y_RT_quali + dgf_prct_quali + PR2012_T1_Abst_prct_insc_quali,
+             # P09_POP_quantiles + CATAEU2010 + `Médecin omnipraticien_quantiles` + PotFin4taxes_prct_quantiles + Supermarché_quantiles + C09_EMP_CONC_RT_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + P09_POP1529Y_RT_quantiles + dgf_prct_quantiles + PR2012_T1_Abst_prct_insc_quantiles,
 
+# Variables s'inspirant des pas à pas (test1) avec CIF 2012
+             # CODE_DEPT + P09_POP_quantiles + CATAEU2010 + `Médecin omnipraticien_quantiles` + PotFin4taxes_prct_quantiles + Supermarché_quantiles + C09_EMP_CONC_RT_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + P09_POP1529Y_RT_quantiles + dgf_prct_quantiles + CIF_2012_quantiles,
+# Variables s'inspirant des pas à pas, sans départements (test2) avec CIF 2012
+             # P09_POP_quantiles + CATAEU2010 + `Médecin omnipraticien_quantiles` + PotFin4taxes_prct_quantiles + Supermarché_quantiles + C09_EMP_CONC_RT_quantiles + PR2012_T1_prct_insc_LE.PEN_quantiles + P09_POP1529Y_RT_quantiles + dgf_prct_quantiles + CIF_2012_quantiles,
+
+  
 # Quelques variables simples
-             # P09_POP_quali + superficie_quali + CATAEU2010 + CODE_DEPT,
-             # P09_POP_quali + superficie_quali + CATAEU2010,
-             # P09_POP_quali +  CATAEU2010 + CODE_DEPT,
+             # P09_POP_quantiles + superficie_quantiles + CATAEU2010 + CODE_DEPT,
+             # P09_POP_quantiles + superficie_quantiles + CATAEU2010,
+             # P09_POP_quantiles +  CATAEU2010 + CODE_DEPT,
 
+# Test CIF
+             # CIF_2012_quantiles + CODE_DEPT,
+             P09_POP_quantiles +  CATAEU2010 + CIF_2012_quantiles,
+             # CIF_2012_quantiles,
+  
+  
            data = df_reg, family = binomial(logit), na.action = na.exclude)
 
 options(max.print=700)
@@ -962,12 +977,12 @@ paste("Un ODD RATIO de", exp(reg$coefficients[2]), "signifie la chance relative 
 ## Sauvegarde données modèle
 
 
-```{r sauvegarde_modele}
+```{r sauvegarde_modele, eval=FALSE}
 
 # try(save(df_reg, reg, file = "data/modeles/refdata_modele_test_ttes_communes.Rdata"))
 # try(save(df_reg, reg, file = "data/modeles/refdata_modele_test2.Rdata"))
 
-load("data/modeles/refdata_modele_test2.Rdata")
+# load("data/modeles/refdata_modele_test2.Rdata")
 
 
 # try(save(test, file = "data/modeles/refdata_modele_test1_tableau_resultats.Rdata"))
@@ -989,12 +1004,17 @@ Pour les modèles intégrant les appartenances départementales, il n'est pas ai
 # try(save(test, file = "data/modeles/refdata_modele_test1_tableau_resultats.Rdata"))
 load("data/modeles/refdata_modele_test1_tableau_resultats.Rdata")
 
+tableau_departements <- test [9:100,c(1, 2, 4)]
 tableau_departements <- test [3:92,c(1, 2, 4)]
 colnames(tableau_departements) <- c("CODE_DEPT", "OR", "pvalue")
+tableau_departements$pvalue <- sub(",", ".", tableau_departements$pvalue, fixed = TRUE) # Si besoin
+tableau_departements$OR <- sub(",", ".", tableau_departements$OR, fixed = TRUE) # Si besoin
 tableau_departements$pvalue[tableau_departements$pvalue == "<0.001"] <- 0.0001
 tableau_departements$pvalue[tableau_departements$pvalue == ">0.9"] <- 1
 # On passe les variables en numérique
-tableau_departements <- as.data.frame(apply(tableau_departements, 2, as.numeric))
+# tableau_departements <- as.data.frame(apply(tableau_departements, 2, as.numeric))
+tableau_departements$pvalue <- as.numeric(tableau_departements$pvalue)
+tableau_departements$OR <- as.numeric(tableau_departements$OR)
 
 # Choix d'un seuil à partir duquel on ne représente plus les départements
 seuil_choisi <- 0.1
@@ -1003,12 +1023,12 @@ tableau_departements <- subset(tableau_departements, tableau_departements$pvalue
 tableau_departements <- merge(dep, tableau_departements, by = "CODE_DEPT", all.x = TRUE)
 par(mar=c(0,2,1.2,2))
 
-layoutLayer(title = " ",
+layoutLayer(title = "Cartographie de la variable d'appartenance départementale pour le modèle 1",
             author = "G. Bideau, 2024",
             sources = paste0( "Les départements non renseignés ont\nune p-value supérieure à ", seuil_choisi, ".\n\n",
                               "Sources : INSEE, IGN, 2024"), extent = dep,
             frame = FALSE,
-            col = "white",
+            col = "white", coltitle = "black",
             tabtitle = FALSE)
 
 plot(st_geometry(dep), col = NA, add = TRUE)
@@ -1081,7 +1101,9 @@ Cf. *R et Espace* section 5.2.3 et particulièrement p. 91 sq pour aperçu des r
 Autre source très utilisée ci-dessous : https://sites.google.com/site/rgraphiques/4--stat/machine-learning-biostatistiques-analyse-de-donn%C3%A9es/r%C3%A9gressions-lin%C3%A9aires-avec-r?pli=1
 
 ```{r etude_residus, eval=FALSE}
-
+# Pour regarder quelques résidus
+df_reg_subset <- df_reg[, c("CODGEO", "COM_NOUV",  "LIBGEO", "LIBGEO_new", "CODE_DEPT", "CIF_2012_quantiles", "residus")]
+colnames(df_reg)
 
 # On veut éviter les phénomènes d'auto-corrélation : les résidus augmenteraient ensemble dans une zone donnée et seraient liés les uns aux résidus précédents ou suivants (cas typiques lorsque X est un enregistrement du temps). Vérification par le test de Durbin-Watson (indépendance : p-value > 0,05)
 durbinWatsonTest(reg)
@@ -1139,11 +1161,11 @@ abline(h=c(-2,2))
 # Résidus partiels (résidus pour une variable)
 # Cf. https://lrouviere.github.io/doc_cours/poly_logistique.pdf#page=50
 residpartiels<-resid(reg,type="partial")
-prov<-loess(residpartiels[,"P09_POP_quali"]~df_reg$P09_POP_quali)
-ordre<-order(df_reg$P09_POP_quali)
-plot(df_reg$P09_POP_quali,residpartiels[,"P09_POP_quali"],type="p",cex=0.5,xlab="",ylab="")
-matlines(df_reg$P09_POP_quali[ordre],predict(prov)[ordre])
-abline(lsfit(df_reg$P09_POP_quali,residpartiels[,"P09_POP_quali"]),lty=2)
+prov<-loess(residpartiels[,"P09_POP_quantiles"]~df_reg$P09_POP_quantiles)
+ordre<-order(df_reg$P09_POP_quantiles)
+plot(df_reg$P09_POP_quantiles,residpartiels[,"P09_POP_quantiles"],type="p",cex=0.5,xlab="",ylab="")
+matlines(df_reg$P09_POP_quantiles[ordre],predict(prov)[ordre])
+abline(lsfit(df_reg$P09_POP_quantiles,residpartiels[,"P09_POP_quantiles"]),lty=2)
 
 ```
 
@@ -1151,10 +1173,13 @@ abline(lsfit(df_reg$P09_POP_quali,residpartiels[,"P09_POP_quali"]),lty=2)
 
 ```{r carto_residus}
 
+
+
 # residuals (reg)
 # On intègre les résidus aux données
 df_reg$residus <- residuals (reg)
 par(mar=c(8,0,8,0), mfrow = c(1,2))
+par(mar=c(4,0,8,0), mfrow = c(1,2))
 
 
 choroLayer(x = df_reg , var = "residus", 
@@ -1183,24 +1208,13 @@ typoLayer(x = df_reg, var = "COM_NOUV",
           border = NA)
 
 layoutLayer(title = "Participation à une commune nouvelle 2012-2024(01)",
+  # title = "Situation entre 2012 et le 1er janvier 2024",
             author = "Auteur : G. Bideau, 2024.",
             sources = "Sources : INSEE, 2024.", col = "white", coltitle = "black")
 
 par(mar = c(0,0,0,0), mfrow = c(1,1))
 ```
 
-
-
-
-```{r limite_pas_jouer, eval=TRUE, cache=FALSE}
-knitr::opts_chunk$set(echo=FALSE, # Afficher ou non le code R dans le document
-                      eval=FALSE, #	Exécuter ou non le code R à la compilation
-                      include=TRUE, #	Inclure ou non le code R et ses résultats dans le document
-                      # results	“hide”/“asis”/“markup”/“hold”	Type de résultats renvoyés par le bloc de code
-                      warning=TRUE, # Afficher ou non les avertissements générés par le bloc
-                      message=TRUE, # Afficher ou non les messages générés par le bloc
-                      cache=TRUE) # Utiliser le cache pour accélerer les knits.
-```
 
 
 
@@ -1273,6 +1287,22 @@ rm(variable, df_variable, lms, pvals, cats, lbls, num_levels, couleurs)
 
 ```
 
+
+
+
+```{r limite_pas_jouer, eval=TRUE, cache=FALSE}
+knitr::opts_chunk$set(echo=FALSE, # Afficher ou non le code R dans le document
+                      eval=FALSE, #	Exécuter ou non le code R à la compilation
+                      include=TRUE, #	Inclure ou non le code R et ses résultats dans le document
+                      # results	“hide”/“asis”/“markup”/“hold”	Type de résultats renvoyés par le bloc de code
+                      warning=TRUE, # Afficher ou non les avertissements générés par le bloc
+                      message=TRUE, # Afficher ou non les messages générés par le bloc
+                      cache=TRUE) # Utiliser le cache pour accélerer les knits.
+```
+
+
+
+
 # Sélection *step by step*, *Forward stepwise* ou *backward stepwise*
 
 Possibilité de sélectionner automatiquement les variables à choisir pour une régression logistique [feuillet2019] p. 174 :
@@ -1298,17 +1328,20 @@ variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "
 variables_sbs <- c(variables_sbs, variables_elect)
 
 # En ne prenant que les variables passées en quantiles
-variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantile") == TRUE)]),
+variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantiles") == TRUE)]),
+                   "CATAEU2010", "CODE_DEPT")
+# Quand les variables en quantiles étaient estampillées "_quali"
+variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantiles") == TRUE)]),
                    colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quali") == TRUE)]),
                    "CATAEU2010", "CODE_DEPT")
-# variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantile") == TRUE)]),
-#                    colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quali") == TRUE)]),
+# variables_sbs <- c(colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantiles") == TRUE)]),
+#                    colnames(df_reg[which(stringr::str_detect(colnames(df_reg), "_quantiles") == TRUE)]),
 #                    "CATAEU2010")# enleve CODE_DEPT pour étude d'un département en particuler
 
 # On supprime la variable "geometry" qui est intégrée sans que cela soit voulu
 variables_sbs <- variables_sbs[variables_sbs!= "geometry"]
 
-
+variables_sbs
 ```
 
 ## Vérification des auto-corrélations et des manques de données
@@ -1329,8 +1362,8 @@ nbr_na <- as.data.frame(apply(df_autocor, MARGIN = 2, function(x){sum(is.na(x))}
 nbr_na
 
 # On désigne les variables qui ont plus de 5000 NA 
-a_retirer <- row.names(nbr_na)[which(nbr_na$`apply(df_autocor, MARGIN = 2, function(x) {     sum(is.na(x)) })` > 1600)]
-
+a_retirer <- row.names(nbr_na)[which(nbr_na$`apply(df_autocor, MARGIN = 2, function(x) {     sum(is.na(x)) })` > 2000)]
+a_retirer
 # On retire les variables en question
 variables_correlations <- setdiff(variables_correlations, a_retirer)
 
@@ -1359,7 +1392,6 @@ df_reg_sbs <- st_set_geometry (df_reg_sbs, NULL)
 
 
 
-
 ## Régression pas à pas 
 
 ### Préparation données pour régression stepwise
@@ -1372,6 +1404,8 @@ m0 <- glm(COM_NOUV ~ 1, data=df_reg_sbs, family = binomial(logit), na.action = n
 mf <- glm(COM_NOUV ~ ., data=df_reg_sbs, family = binomial(logit), na.action = na.exclude)  # choix du modèle avec constante seulement
 # mf
 ```
+
+
 
 ### Stepwise ascendante (forward)
 
@@ -1389,7 +1423,7 @@ kable(as.data.frame(test_reg_chi2))
 test_anova <- Anova(reg_sbs_forward)
 kable(as.data.frame(test_anova))
 
-try(save(df_reg, reg_sbs_forward, file = "data/refdata_modele_sbs_forward_Ouest.Rdata"))
+# try(save(df_reg, reg_sbs_forward, file = "data/refdata_modele_sbs_forward_Ouest.Rdata"))
 # load("data/refdata_modele.Rdata")
 
 # Cartographie des résultats
@@ -1429,7 +1463,6 @@ par(mar = c(0,0,0,0), mfrow = c(1,1))
 
 
 
-
 ### Stepwise descendante (backward)
 
 ```{r stepwise backward, warning=FALSE}
@@ -1447,6 +1480,8 @@ test_anova <- Anova(reg_sbs_backward)
 kable(as.data.frame(test_anova))
 
 ```
+
+
 
 
 
@@ -1555,6 +1590,16 @@ res3 <- glmulti::glmulti(COM_NOUV~.,data = df_reg_gen, level = 2, method = "g", 
 ```
 
 
+
+```{r limite_pas_cache, eval=TRUE, cache=FALSE}
+knitr::opts_chunk$set(echo=TRUE, # Afficher ou non le code R dans le document
+                      eval=TRUE, #	Exécuter ou non le code R à la compilation
+                      include=TRUE, #	Inclure ou non le code R et ses résultats dans le document
+                      # results	“hide”/“asis”/“markup”/“hold”	Type de résultats renvoyés par le bloc de code
+                      warning=TRUE, # Afficher ou non les avertissements générés par le bloc
+                      message=TRUE, # Afficher ou non les messages générés par le bloc
+                      cache=FALSE) # Utiliser le cache pour accélerer les knits.
+```
 
 
 # Bibliographie
