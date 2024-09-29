@@ -1290,18 +1290,6 @@ rm(variable, df_variable, lms, pvals, cats, lbls, num_levels, couleurs)
 
 
 
-```{r limite_pas_jouer, eval=TRUE, cache=FALSE}
-knitr::opts_chunk$set(echo=FALSE, # Afficher ou non le code R dans le document
-                      eval=FALSE, #	Exécuter ou non le code R à la compilation
-                      include=TRUE, #	Inclure ou non le code R et ses résultats dans le document
-                      # results	“hide”/“asis”/“markup”/“hold”	Type de résultats renvoyés par le bloc de code
-                      warning=TRUE, # Afficher ou non les avertissements générés par le bloc
-                      message=TRUE, # Afficher ou non les messages générés par le bloc
-                      cache=TRUE) # Utiliser le cache pour accélerer les knits.
-```
-
-
-
 
 # Sélection *step by step*, *Forward stepwise* ou *backward stepwise*
 
@@ -1459,6 +1447,18 @@ layoutLayer(title = "Communes nouvelles 2012-2024(01)",
 
 par(mar = c(0,0,0,0), mfrow = c(1,1))
 
+```
+
+
+
+```{r limite_pas_jouer, eval=TRUE, cache=FALSE}
+knitr::opts_chunk$set(echo=FALSE, # Afficher ou non le code R dans le document
+                      eval=FALSE, #	Exécuter ou non le code R à la compilation
+                      include=TRUE, #	Inclure ou non le code R et ses résultats dans le document
+                      # results	“hide”/“asis”/“markup”/“hold”	Type de résultats renvoyés par le bloc de code
+                      warning=TRUE, # Afficher ou non les avertissements générés par le bloc
+                      message=TRUE, # Afficher ou non les messages générés par le bloc
+                      cache=TRUE) # Utiliser le cache pour accélerer les knits.
 ```
 
 
