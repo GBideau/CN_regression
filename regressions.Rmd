@@ -421,6 +421,7 @@ histo <- ggplot(df_sans_geom)+
 # print(histo)
 
 # On découpe en fonction du quantile souhaité puis on modifie l'ordre de niveaux de facteur pour que la variable centrale soit la première
+# NB : Il aurait été possible choisir d'autres manières de diviser en quantiles. Cf. quelques idées ici : https://mtes-mct.github.io/parcours_r_module_statistiques_descriptives/une-variable-quantitative.html#discr%C3%A9tisation-dune-variable-continue:~:text=%22Sup_94.6%22)))-,10.4.2%20M%C3%A9thode%20des%20seuils%20naturels%20(m%C3%A9thode%20de%20Jenks),-Cette%20m%C3%A9thode%20revient
 
 coupures <- quantile(Y, probs=seq(0, 1, 0.2), na.rm = TRUE)
 
@@ -1085,6 +1086,10 @@ On observe que les variables des navetteurs et de l'abstention sont potentiellem
 Non-stationnarité spatiale : lorsque les paramètres permettant d'expliquer un phénomènes sont différents en fonction des espaces. Bonne figure p. 185 (Feuillet et al, 2019) où en regardant deux groupes distincts on aperçoit un type de relation alors que lorsqu'on regarde les deux en même temps, on imagine une autre relation statistique. C'est le paradoxe de Simpson (qui n'est pas forcément situé).
 
 Il est donc intéressant voire important de cartographier ou de représenter graphiquement les résidus. Cela permet potentiellement de valider ou invalider le modèle mais également de réfléchir aux espaces où ce modèle fonctionne le mieux ou le moins bien.
+
+## Addendum concernant l'analyse des résidus dans la thèse soutenue en décembre 2024
+
+L'analyse des résidus proposée dans la thèse soutenue en décembre 2024 mériterait d'être complétée. En effet, le modèle logit (comme c'est souvent le cas dans les sciences humaines) ne correspond pas totalement à la réalité. L'étude des résidus permet de comprendre si le poids des variables intégrées au modèle est sur- ou sous-estimé. Dans les cartes des résidus (thèse p. 338 ou ci-dessous), les résidus sont importants et positifs dans deux cas : pour l'ensemble des communes des départements avec très peu de communes fusionnantes ainsi que pour les communes fusiannantes dans les départements avec beaucoup de communes fusionnantes. On peut donc considérer, pour le dire autrement, que le modèle arrive mal à distinguer les spécificités des communes fusionnantes par-rapport aux autres communes du même département. C'est clairement une limite du modèle mis en œuvre.
 
 ## Étude résidus régression linéaire (peu pertinent dans le cas d'un logit)
 
